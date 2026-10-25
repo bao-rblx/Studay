@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build -t studay:ci .
+      - name: Smoke test the image against a throwaway Postgres
+        run: |
+          docker network create ci
+          docker run -d --name db --network ci \
+            -e POSTGRES_USER=studay -e POSTGRES_PASSWORD=studay -e POSTGRES_DB=studay \
+            postgres:16-alpine
+          until docker exec db pg_isready -U studay -d studay; do sleep 1; done
+          docker run -d --name app --network ci -p 3000:3000 \
+            -e DATABASE_URL=postgres://studay:studay@db:5432/studay studay:ci
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:3000/api/health && exit 0
+            sleep 1
+          done
+          docker logs app
+          exit 1
