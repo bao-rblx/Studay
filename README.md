@@ -29,12 +29,6 @@ Open http://localhost:3000
 - `GET/POST /api/flashcards` (+ `?note_id=`), `DELETE /api/flashcards/:id`
 - `POST /api/ai/generate` with `{ note_id }` or `{ content }`, optional `mode: summary|flashcards|quiz|all` (400 if text missing or under 30 chars; long input truncated to 12k chars)
 
-## Demo flow (60 seconds)
-
-1. Add a subject (e.g. Biology).
-2. Add a note with 4-6 full sentences.
-3. Click **AI generate** - summary, flashcards, and quiz appear; cards are saved automatically.
-4. Open **Flashcards → Study mode** (Space flips), then **Quiz**, then toggle **dark mode**.
 
 ## Team
 
