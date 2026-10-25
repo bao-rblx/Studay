@@ -32,6 +32,6 @@ Open http://localhost:3000
 
 ## Team
 
-- Member A - Backend + Database (`server.js`, `schema.sql`)
-- Member B - Frontend (`public/`)
-- Member C - AI Integration (`ai.js`, docs)
+- Luu Gia Bao - 2474802010028 - Backend + Database (`server.js`, `schema.sql`)
+- Nguyen Trung Duc - 2474802010092 - Frontend (`public/`)
+- Tran Quang Minh - 2474802010241 - AI Integration (`ai.js`, docs)
