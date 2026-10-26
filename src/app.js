@@ -11,7 +11,7 @@ const AI_MIN_CHARS = 30;
 const AI_MAX_CHARS = 12000;
 const isId = (v) => /^[1-9]\d{0,9}$/.test(String(v));
 
-function createApp({ pool }) {
+function createApp({ pool, ai = generateStudyAids }) {
   const app = express();
   const q = async (sql, params) => (await pool.query(sql, params)).rows;
   const one = async (sql, params) => (await q(sql, params))[0];
@@ -131,7 +131,7 @@ function createApp({ pool }) {
     text = String(text || '').trim();
     if (!text) return res.status(400).json({ error: 'content or note_id required' });
     if (text.length < AI_MIN_CHARS) return res.status(400).json({ error: 'note text too short - paste at least a paragraph' });
-    res.json(await generateStudyAids(text.slice(0, AI_MAX_CHARS), mode || 'all'));
+    res.json(await ai(text.slice(0, AI_MAX_CHARS), mode || 'all'));
   }));
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'unknown endpoint' }));
