@@ -1,0 +1,19 @@
+# Keep secrets, local data and build noise out of the image and build context.
+.env
+.env.*
+!.env.example
+node_modules
+npm-debug.log
+*.db
+*.zip
+.git
+.github
+.gitignore
+.dockerignore
+Dockerfile
+compose.yaml
+test
+docs
+coverage
+eslint.config.js
+*.md
