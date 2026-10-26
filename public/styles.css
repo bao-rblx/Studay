@@ -272,3 +272,12 @@ button.ok { background: linear-gradient(135deg, #34c759, #0aa84f); box-shadow: 0
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- failure states ---------- */
+#status-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  padding: .7rem 1rem; text-align: center; font-weight: 600;
+  background: #ff9f0a; color: #1d1d1f;
+}
+.ai-notice { border-left: 4px solid #ff9f0a; }
+.ai-source { font-size: .8rem; opacity: .7; margin: .2rem 0 .8rem; }

@@ -1,0 +1,19 @@
+# Render Blueprint: one free Docker web service. Secrets are set in the Render
+# dashboard (sync: false), never here.
+services:
+  - type: web
+    name: studay
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    autoDeploy: false   # deploys are triggered by the CI deploy job after checks pass
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
