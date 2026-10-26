@@ -121,10 +121,10 @@ function sanitize(ai, mode) {
 }
 
 // Gemini first; on any failure fall back to the offline generator and tell the user why.
-async function generateStudyAids(text, mode = 'all', { apiKey = process.env.GEMINI_API_KEY, model = process.env.GEMINI_MODEL, fetchImpl, log = console } = {}) {
+async function generateStudyAids(text, mode = 'all', { apiKey = process.env.GEMINI_API_KEY, model = process.env.GEMINI_MODEL, timeoutMs = Number(process.env.GEMINI_TIMEOUT_MS) || undefined, fetchImpl, log = console } = {}) {
   if (!apiKey) return { source: 'offline', notice: 'AI key not configured - using the offline generator.', ...generateOffline(text, mode) };
   try {
-    const out = sanitize(await callGemini(text, mode, { apiKey, model: model || undefined, fetchImpl }), mode);
+    const out = sanitize(await callGemini(text, mode, { apiKey, model: model || undefined, timeoutMs, fetchImpl }), mode);
     if (!Object.keys(out).length) throw new AiError('bad_output', 'AI output had none of the requested sections');
     return { source: 'gemini', ...out };
   } catch (err) {
