@@ -82,3 +82,14 @@ test('unknown API route returns JSON 404', async () => {
   assert.equal(res.status, 404);
   assert.equal(res.body.error, 'unknown endpoint');
 });
+
+test('database down: API answers 503 instead of crashing', async () => {
+  const { createApp } = require('../src/app');
+  const down = { query: async () => { const e = new Error('connect ECONNREFUSED'); e.code = 'ECONNREFUSED'; throw e; } };
+  const broken = createApp({ pool: down });
+  const health = await request(broken).get('/api/health');
+  assert.equal(health.status, 503);
+  const list = await request(broken).get('/api/subjects');
+  assert.equal(list.status, 503);
+  assert.equal(list.headers['retry-after'], '10');
+});
