@@ -1,0 +1,35 @@
+# Local development stack: `docker compose up --build` from a clean clone.
+# Production uses Render (app) + Supabase (managed Postgres) instead of the `db` service.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: studay
+      POSTGRES_PASSWORD: studay
+      POSTGRES_DB: studay
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studay -d studay"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Services find each other by name on the Compose network: host "db".
+      DATABASE_URL: postgres://studay:studay@db:5432/studay
+      DB_SSL: "false"
+      PORT: "3000"
+      # Optional: export GEMINI_API_KEY in your shell to use the real AI locally.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
