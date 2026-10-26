@@ -58,3 +58,33 @@ jobs:
           done
           docker logs app
           exit 1
+
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: [build]
+    # Only after a merge to main, never on a pull request.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::error::Secret RENDER_DEPLOY_HOOK is not set (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+          echo "Deploy triggered on Render."
+      - name: Wait for the live site to report healthy
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then echo "APP_URL variable not set, skipping check"; exit 0; fi
+          sleep 60
+          for i in $(seq 1 20); do
+            curl -fs "$APP_URL/api/health" && exit 0
+            sleep 15
+          done
+          echo "::error::Live site did not become healthy"
+          exit 1
