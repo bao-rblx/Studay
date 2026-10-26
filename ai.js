@@ -1,6 +1,8 @@
-// Studay AI-assisted feature - Member C (AI Integration)
-// Offline extractive MVP. Drop-in point for an LLM API (see bottom).
+// Studay AI-assisted feature.
+// Primary: Google Gemini (src/gemini.js), called from the server only.
+// Fallback: offline extractive generator below, used when the key is missing or the API fails.
 // Modes: 'summary' | 'flashcards' | 'quiz' | 'all'. Unknown modes fall back to 'all'.
+const { callGemini, AiError } = require('./src/gemini');
 
 const STOPWORDS = new Set(
   'a,an,the,and,or,but,if,then,else,when,at,by,for,with,about,into,through,of,to,in,on,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,can,could,should,may,might,must,as,it,its,this,that,these,those,from,not,no,so,such,than,too,very,just,also,there,their,they,them,his,her,our,you,your,we,us,i,he,she,we,our,my,me,his,ours'.split(',')
@@ -75,7 +77,7 @@ function makeQuiz(text) {
   });
 }
 
-function generateStudyAids(text, mode = 'all') {
+function generateOffline(text, mode = 'all') {
   const out = {};
   const m = ['summary', 'flashcards', 'quiz'].includes(mode) ? mode : 'all';
   if ((m === 'all' || m === 'summary') && text.trim().length >= 30) out.summary = summarize(text);
@@ -84,15 +86,52 @@ function generateStudyAids(text, mode = 'all') {
   return out;
 }
 
-// --- To upgrade to a real LLM later (OpenAI example), replace the body of
-// --- generateStudyAids with a fetch call:
-// const res = await fetch('https://api.openai.com/v1/chat/completions', {
-//   method: 'POST',
-//   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-//   body: JSON.stringify({ model: 'gpt-4o-mini',
-//     messages: [{ role: 'user', content: `From these study notes, produce a summary, 5 flashcards, and 3 quiz questions:\n\n${text}` }] }),
-// });
-// const data = await res.json();
-// return { raw: data.choices[0].message.content };
+const NOTICES = {
+  rate_limited: 'The AI is busy (free quota reached). Showing a basic offline version instead - try again in a minute.',
+  timeout: 'The AI took too long to answer. Showing a basic offline version instead.',
+  upstream: 'The AI service is unavailable right now. Showing a basic offline version instead.',
+  empty: 'The AI returned nothing usable. Showing a basic offline version instead.',
+  bad_output: 'The AI returned something we could not read. Showing a basic offline version instead.',
+};
 
-module.exports = { generateStudyAids };
+// Keep only well-formed items so a malformed AI answer cannot break the page.
+function sanitize(ai, mode) {
+  const out = {};
+  const m = ['summary', 'flashcards', 'quiz'].includes(mode) ? mode : 'all';
+  if ((m === 'all' || m === 'summary') && ai.summary && typeof ai.summary.summary === 'string') {
+    out.summary = {
+      summary: ai.summary.summary,
+      key_points: Array.isArray(ai.summary.key_points) ? ai.summary.key_points.map(String).slice(0, 8) : [],
+    };
+  }
+  if ((m === 'all' || m === 'flashcards') && Array.isArray(ai.flashcards)) {
+    out.flashcards = ai.flashcards
+      .filter((c) => c && c.front && c.back)
+      .slice(0, 10)
+      .map((c) => ({ front: String(c.front), back: String(c.back) }));
+  }
+  if ((m === 'all' || m === 'quiz') && Array.isArray(ai.quiz)) {
+    out.quiz = ai.quiz
+      .filter((q) => q && q.question && Array.isArray(q.options) && q.options.length >= 2
+        && Number.isInteger(q.answer_index) && q.answer_index >= 0 && q.answer_index < q.options.length)
+      .slice(0, 10)
+      .map((q) => ({ question: String(q.question), options: q.options.map(String), answer_index: q.answer_index, explanation: String(q.explanation || '') }));
+  }
+  return out;
+}
+
+// Gemini first; on any failure fall back to the offline generator and tell the user why.
+async function generateStudyAids(text, mode = 'all', { apiKey = process.env.GEMINI_API_KEY, model = process.env.GEMINI_MODEL, fetchImpl, log = console } = {}) {
+  if (!apiKey) return { source: 'offline', notice: 'AI key not configured - using the offline generator.', ...generateOffline(text, mode) };
+  try {
+    const out = sanitize(await callGemini(text, mode, { apiKey, model: model || undefined, fetchImpl }), mode);
+    if (!Object.keys(out).length) throw new AiError('bad_output', 'AI output had none of the requested sections');
+    return { source: 'gemini', ...out };
+  } catch (err) {
+    const kind = err instanceof AiError ? err.kind : 'upstream';
+    log.warn(`[ai] falling back to offline generator: ${kind} (${err.message})`);
+    return { source: 'offline', fallback_reason: kind, notice: NOTICES[kind], ...generateOffline(text, mode) };
+  }
+}
+
+module.exports = { generateStudyAids, generateOffline };
