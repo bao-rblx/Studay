@@ -3,6 +3,7 @@
 const path = require('path');
 const express = require('express');
 const { generateStudyAids } = require('../ai');
+const { isDbDown } = require('./db');
 
 // Express 4 does not catch rejected promises from async handlers.
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -141,6 +142,10 @@ function createApp({ pool, ai = generateStudyAids }) {
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'invalid JSON body' });
     if (err.code === '22P02') return res.status(400).json({ error: 'invalid id' });
     if (err.code === '23503') return res.status(400).json({ error: 'referenced record does not exist' });
+    if (isDbDown(err)) {
+      console.warn('[db] request failed, database unreachable:', err.code || err.message);
+      return res.status(503).set('Retry-After', '10').json({ error: 'database is waking up - try again in a few seconds' });
+    }
     console.error(err);
     res.status(500).json({ error: 'internal server error' });
   });
