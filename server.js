@@ -1,13 +1,13 @@
 // Entry point: load configuration, connect, migrate, listen.
 require('dotenv').config();
-const { createPool, migrate } = require('./src/db');
+const { createPool, migrateWithRetry } = require('./src/db');
 const { createApp } = require('./src/app');
 
 const PORT = Number(process.env.PORT || 3000);
 
 async function main() {
   const pool = createPool();
-  await migrate(pool);
+  await migrateWithRetry(pool);
   const app = createApp({ pool });
   app.listen(PORT, '0.0.0.0', () => console.log(`Studay listening on port ${PORT}`));
 }
