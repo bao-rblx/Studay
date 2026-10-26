@@ -1,6 +1,7 @@
 // Google Gemini client. Called only from the server; the key never reaches the browser.
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-const TIMEOUT_MS = 10000;
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+
+const TIMEOUT_MS = 60000;
 
 class AiError extends Error {
   constructor(kind, message, status) {
@@ -42,7 +43,11 @@ async function callGemini(text, mode, { apiKey, model = DEFAULT_MODEL, fetchImpl
   }
 
   if (res.status === 429) throw new AiError('rate_limited', 'AI quota exceeded', 429);
-  if (!res.ok) throw new AiError('upstream', `AI returned HTTP ${res.status}`, res.status);
+  if (!res.ok) {
+    // Google explains the failure (bad key, model not found, ...) in the body; keep a short slice for the server log.
+    const body = await res.text().catch(() => '');
+    throw new AiError('upstream', `AI returned HTTP ${res.status}: ${body.slice(0, 300)}`, res.status);
+  }
 
   const data = await res.json();
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
