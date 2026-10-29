@@ -39,6 +39,21 @@ test('subjects: name is required', async () => {
   assert.equal(res.status, 400);
 });
 
+test('notes, materials and events cascade when the subject is deleted', async () => {
+  const subject = (await request(app).post('/api/subjects').send({ name: 'Chemistry' })).body;
+  const note = await request(app).post('/api/notes').send({ subject_id: subject.id, title: 'Atoms', content: NOTE_TEXT });
+  assert.equal(note.status, 201);
+  const mat = await request(app).post('/api/materials').send({ subject_id: subject.id, title: 'Slides', content: NOTE_TEXT });
+  assert.equal(mat.status, 201);
+  const ev = await request(app).post('/api/events').send({ title: 'Lab', event_date: '2025-11-10', subject_id: subject.id });
+  assert.equal(ev.status, 201);
+
+  await request(app).delete(`/api/subjects/${subject.id}`);
+  assert.equal((await request(app).get(`/api/notes?subject_id=${subject.id}`)).body.length, 0);
+  assert.equal((await request(app).get(`/api/materials?subject_id=${subject.id}`)).body.length, 0);
+  assert.ok(!(await request(app).get('/api/events')).body.some((e) => e.id === ev.body.id));
+});
+
 test('notes and flashcards cascade when the subject is deleted', async () => {
   const subject = (await request(app).post('/api/subjects').send({ name: 'Chemistry' })).body;
   const note = (await request(app).post('/api/notes').send({ subject_id: subject.id, title: 'Atoms', content: NOTE_TEXT })).body;
@@ -51,6 +66,40 @@ test('notes and flashcards cascade when the subject is deleted', async () => {
   await request(app).delete(`/api/subjects/${subject.id}`);
   const after = await request(app).get(`/api/flashcards?note_id=${note.id}`);
   assert.equal(after.body.length, 0);
+});
+
+test('subjects: timetable fields and bulk create', async () => {
+  const res = await request(app).post('/api/subjects/bulk').send({ subjects: [
+    { name: 'Databases', teacher: 'Dr. Lan', schedule: [{ day: 1, start: '07:30', end: '09:30' }, { day: 8 }] },
+    { name: 'Networks' },
+  ] });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.length, 2);
+  assert.equal(res.body[0].teacher, 'Dr. Lan');
+  assert.deepEqual(res.body[0].schedule, [{ day: 1, start: '07:30', end: '09:30', room: null }]);
+  assert.equal((await request(app).post('/api/subjects/bulk').send({ subjects: [{ name: '' }] })).status, 400);
+  assert.equal((await request(app).post('/api/subjects/bulk').send({})).status, 400);
+});
+
+test('events: create, range query, mark done, validation', async () => {
+  const created = await request(app).post('/api/events').send({ title: 'Presentation', kind: 'presentation', event_date: '2025-12-01', start_time: '09:00' });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.event_date, '2025-12-01');
+
+  const inRange = await request(app).get('/api/events?from=2025-12-01&to=2025-12-31');
+  assert.ok(inRange.body.some((e) => e.id === created.body.id));
+  const outRange = await request(app).get('/api/events?from=2026-01-01&to=2026-01-31');
+  assert.ok(!outRange.body.some((e) => e.id === created.body.id));
+
+  const done = await request(app).put(`/api/events/${created.body.id}`).send({ done: true });
+  assert.equal(done.body.done, true);
+  assert.equal(done.body.title, 'Presentation');
+
+  assert.equal((await request(app).post('/api/events').send({ title: 'x', event_date: '01/12/2025' })).status, 400);
+  assert.equal((await request(app).post('/api/events').send({ title: 'x', event_date: '2025-12-01', start_time: '9am' })).status, 400);
+  assert.equal((await request(app).get('/api/events?from=bad&to=2025-12-01')).status, 400);
+  assert.equal((await request(app).delete(`/api/events/${created.body.id}`)).status, 200);
+  assert.equal((await request(app).delete(`/api/events/${created.body.id}`)).status, 404);
 });
 
 test('notes: missing fields and unknown subject are rejected with 400', async () => {
@@ -69,6 +118,7 @@ test('AI: generates study aids from pasted text', async () => {
   assert.equal(res.status, 200);
   assert.ok(res.body.summary.summary.length > 0);
   assert.ok(res.body.quiz.length > 0);
+  assert.equal(res.body.flashcards, undefined);
 });
 
 test('AI: too-short text and unknown note are rejected', async () => {
