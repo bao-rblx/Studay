@@ -54,20 +54,6 @@ test('notes, materials and events cascade when the subject is deleted', async ()
   assert.ok(!(await request(app).get('/api/events')).body.some((e) => e.id === ev.body.id));
 });
 
-test('notes and flashcards cascade when the subject is deleted', async () => {
-  const subject = (await request(app).post('/api/subjects').send({ name: 'Chemistry' })).body;
-  const note = (await request(app).post('/api/notes').send({ subject_id: subject.id, title: 'Atoms', content: NOTE_TEXT })).body;
-  const card = await request(app).post('/api/flashcards').send({ note_id: note.id, front: 'Q', back: 'A' });
-  assert.equal(card.status, 201);
-
-  const byNote = await request(app).get(`/api/flashcards?note_id=${note.id}`);
-  assert.equal(byNote.body.length, 1);
-
-  await request(app).delete(`/api/subjects/${subject.id}`);
-  const after = await request(app).get(`/api/flashcards?note_id=${note.id}`);
-  assert.equal(after.body.length, 0);
-});
-
 test('subjects: timetable fields and bulk create', async () => {
   const res = await request(app).post('/api/subjects/bulk').send({ subjects: [
     { name: 'Databases', teacher: 'Dr. Lan', schedule: [{ day: 1, start: '07:30', end: '09:30' }, { day: 8 }] },
@@ -100,6 +86,10 @@ test('events: create, range query, mark done, validation', async () => {
   assert.equal((await request(app).get('/api/events?from=bad&to=2025-12-01')).status, 400);
   assert.equal((await request(app).delete(`/api/events/${created.body.id}`)).status, 200);
   assert.equal((await request(app).delete(`/api/events/${created.body.id}`)).status, 404);
+});
+
+test('flashcards endpoint is gone', async () => {
+  assert.equal((await request(app).get('/api/flashcards')).status, 404);
 });
 
 test('notes: missing fields and unknown subject are rejected with 400', async () => {
