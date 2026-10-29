@@ -1,0 +1,7 @@
+# Extends the default gitleaks rules. .env.example contains placeholders only.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder values"
+paths = ['''\.env\.example$''']
