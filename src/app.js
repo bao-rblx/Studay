@@ -15,6 +15,10 @@ const EVENT_KINDS = ['deadline', 'exam', 'presentation', 'class', 'other'];
 const isId = (v) => /^[1-9]\d{0,9}$/.test(String(v));
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) && !Number.isNaN(Date.parse(v));
 const isTime = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v));
+// Files the AI can read directly. Plain text is sent as `text` instead.
+const UPLOAD_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'application/pdf'];
+const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const QUESTION_MAX_CHARS = 1000;
 const clean = (v) => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim());
 
 // Weekly timetable entries. Anything malformed is dropped rather than stored.
@@ -31,6 +35,15 @@ function cleanSchedule(list) {
     }));
 }
 
+// Validate a base64 upload ({ mime_type, data }). Returns an error string or null.
+function checkUpload(file) {
+  if (!file || typeof file.data !== 'string' || !file.data) return 'file.data (base64) required';
+  if (!UPLOAD_TYPES.includes(file.mime_type)) return `unsupported file type - use ${UPLOAD_TYPES.join(', ')}`;
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(file.data)) return 'file.data must be base64';
+  if (Math.floor(file.data.length * 3 / 4) > UPLOAD_MAX_BYTES) return 'file too large (max 10 MB)';
+  return null;
+}
+
 // `ai` is injectable so tests never call the real Gemini API.
 function createApp({ pool, ai = {} }) {
   const AI = { ...defaultAi, ...(typeof ai === 'function' ? { generateStudyAids: ai } : ai) };
@@ -40,7 +53,9 @@ function createApp({ pool, ai = {} }) {
   const subjectExists = async (id) => isId(id) && Boolean(await one('SELECT id FROM subjects WHERE id = $1', [id]));
 
   app.disable('x-powered-by');
-  // Materials can hold up to 200k characters of text.
+  // AI routes accept base64 images/PDFs; everything else keeps a small limit.
+  // The first parser that reads the body wins, so the larger one must come first.
+  app.use('/api/ai', express.json({ limit: '15mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -242,6 +257,73 @@ function createApp({ pool, ai = {} }) {
     if (!text) return res.status(400).json({ error: 'content or note_id required' });
     if (text.length < AI_MIN_CHARS) return res.status(400).json({ error: 'note text too short - paste at least a paragraph' });
     res.json(await AI.generateStudyAids(text.slice(0, AI_MAX_CHARS), mode || 'all'));
+  }));
+
+  // Timetable photo -> proposed subjects. Nothing is saved: the user reviews them,
+  // then the page calls POST /api/subjects/bulk.
+  app.post('/api/ai/scan-timetable', wrap(async (req, res) => {
+    const file = (req.body || {}).file;
+    const bad = checkUpload(file);
+    if (bad) return res.status(400).json({ error: bad });
+    if (file.mime_type === 'application/pdf') return res.status(400).json({ error: 'upload a photo or screenshot of the timetable' });
+    res.json(await AI.scanTimetable({ mimeType: file.mime_type, data: file.data }));
+  }));
+
+  // Quick note -> proposed calendar event. Nothing is saved until the user confirms.
+  app.post('/api/ai/quick-note', wrap(async (req, res) => {
+    const { text, today } = req.body || {};
+    const t = clean(text);
+    if (!t) return res.status(400).json({ error: 'text required' });
+    if (today && !isDate(today)) return res.status(400).json({ error: 'today must be YYYY-MM-DD' });
+    const subjects = await q('SELECT id, name FROM subjects ORDER BY id');
+    res.json(await AI.parseQuickNote(t.slice(0, 500), { today, subjects }));
+  }));
+
+  // Teacher file -> extracted text + summary. The page shows it, then saves via POST /api/materials.
+  app.post('/api/ai/read-material', wrap(async (req, res) => {
+    const { file, text, filename } = req.body || {};
+    if (file) {
+      const bad = checkUpload(file);
+      if (bad) return res.status(400).json({ error: bad });
+      return res.json(await AI.readMaterial({ mimeType: file.mime_type, data: file.data, filename }));
+    }
+    const t = String(text || '').trim();
+    if (t.length < AI_MIN_CHARS) return res.status(400).json({ error: 'file or text (at least a paragraph) required' });
+    res.json(await AI.readMaterial({ text: t.slice(0, MATERIAL_MAX_CHARS), filename }));
+  }));
+
+  // Companion chat, grounded in one subject's notes and materials (or everything).
+  app.post('/api/ai/ask', wrap(async (req, res) => {
+    const { question, subject_id } = req.body || {};
+    const qn = clean(question);
+    if (!qn) return res.status(400).json({ error: 'question required' });
+    if (qn.length > QUESTION_MAX_CHARS) return res.status(400).json({ error: 'question too long' });
+    if (subject_id && !isId(subject_id)) return res.status(400).json({ error: 'invalid subject_id' });
+    const where = subject_id ? 'WHERE subject_id = $1' : '';
+    const params = subject_id ? [subject_id] : [];
+    const notes = await q(`SELECT title, content FROM notes ${where} ORDER BY id DESC LIMIT 20`, params);
+    const mats = await q(`SELECT title, content FROM materials ${where} ORDER BY id DESC LIMIT 5`, params);
+    const context = [...mats, ...notes].map((r) => `## ${r.title}\n${r.content}`).join('\n\n');
+    res.json(await AI.askCompanion(qn, context));
+  }));
+
+  // Quiz from a subject's saved material (or a single material).
+  app.post('/api/ai/quiz', wrap(async (req, res) => {
+    const { material_id, subject_id } = req.body || {};
+    let rows;
+    if (material_id) {
+      if (!isId(material_id)) return res.status(400).json({ error: 'invalid material_id' });
+      rows = await q('SELECT title, content FROM materials WHERE id = $1', [material_id]);
+    } else if (subject_id) {
+      if (!isId(subject_id)) return res.status(400).json({ error: 'invalid subject_id' });
+      rows = [
+        ...await q('SELECT title, content FROM materials WHERE subject_id = $1 ORDER BY id DESC LIMIT 5', [subject_id]),
+        ...await q('SELECT title, content FROM notes WHERE subject_id = $1 ORDER BY id DESC LIMIT 10', [subject_id]),
+      ];
+    } else return res.status(400).json({ error: 'material_id or subject_id required' });
+    const text = rows.map((r) => `${r.title}\n${r.content}`).join('\n\n').trim();
+    if (text.length < AI_MIN_CHARS) return res.status(400).json({ error: 'not enough study material yet - add notes or a file first' });
+    res.json(await AI.generateStudyAids(text.slice(0, AI_MAX_CHARS), 'quiz'));
   }));
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'unknown endpoint' }));
