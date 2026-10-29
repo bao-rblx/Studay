@@ -1,0 +1,11 @@
+# Every change needs a review; the area owner is requested automatically.
+/src/            @bao-rblx
+/schema.sql      @bao-rblx
+/ai.js           @minhtran27042006-code
+/src/gemini.js   @minhtran27042006-code
+/test/           @minhtran27042006-code
+/.github/        @minhtran27042006-code
+/public/         @Kaizawa388222
+/Dockerfile      @Kaizawa388222
+/compose.yaml    @Kaizawa388222
+/render.yaml     @Kaizawa388222
