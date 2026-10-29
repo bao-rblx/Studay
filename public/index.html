@@ -10,183 +10,148 @@
 <body>
 <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
 <div class="app">
-  <aside class="sidebar">
-    <div class="logo">Studay<small>AI Study Companion</small></div>
-    <nav>
-      <button class="nav-btn active" data-view="dashboard"><span class="dot"></span>Dashboard</button>
-      <button class="nav-btn" data-view="subjects"><span class="dot"></span>Subjects</button>
-      <button class="nav-btn" data-view="notes"><span class="dot"></span>Notes</button>
-      <button class="nav-btn" data-view="flashcards"><span class="dot"></span>Flashcards</button>
-      <button class="nav-btn" data-view="quiz"><span class="dot"></span>Quiz</button>
-      <button class="nav-btn" data-view="ai"><span class="dot"></span>AI Studio</button>
-      <button class="nav-btn" data-view="timer"><span class="dot"></span>Focus Timer</button>
-    </nav>
-    <div class="sidebar-foot">
-      <button id="theme-toggle" title="Toggle dark mode">Dark mode</button>
-      <div class="xp-wrap">
-        <div class="xp-label"><span>Study XP</span><span id="xp-val">0</span></div>
-        <div class="xp-bar"><div id="xp-fill"></div></div>
-      </div>
+  <!-- Minimal icon rail -->
+  <nav class="rail" aria-label="Main">
+    <div class="rail-logo" title="Studay">S</div>
+    <button class="nav-btn active" data-view="calendar" title="Calendar" aria-label="Calendar"><span class="ico">📅</span><span class="lbl">Calendar</span></button>
+    <button class="nav-btn" data-view="subjects" title="Subjects" aria-label="Subjects"><span class="ico">📚</span><span class="lbl">Subjects</span></button>
+    <button class="nav-btn" data-view="notes" title="Notes" aria-label="Notes"><span class="ico">📝</span><span class="lbl">Notes</span></button>
+    <button class="nav-btn" data-view="quiz" title="Quiz" aria-label="Quiz"><span class="ico">❓</span><span class="lbl">Quiz</span></button>
+    <button class="nav-btn" data-view="buddy" title="Study buddy" aria-label="Study buddy"><span class="ico">🐣</span><span class="lbl">Buddy</span></button>
+    <button class="nav-btn" data-view="timer" title="Focus timer" aria-label="Focus timer"><span class="ico">⏱️</span><span class="lbl">Focus</span></button>
+    <div class="rail-foot">
+      <button id="theme-toggle" class="nav-btn" title="Toggle dark mode" aria-label="Toggle dark mode"><span class="ico">🌙</span></button>
+      <div class="xp-pill" title="Study XP"><span id="xp-val">0</span> XP</div>
+      <div class="xp-pill" title="Day streak">🔥 <span id="streak-val">0</span></div>
     </div>
-  </aside>
+  </nav>
 
-  <div class="main">
-    <header class="topbar">
-      <input id="global-search" placeholder="Search notes, flashcards..." aria-label="Search">
-      <div class="streak">Streak <span id="streak-val">0</span> days</div>
-    </header>
+  <main id="views">
+    <!-- CALENDAR (dashboard) -->
+    <section class="view active" id="view-calendar">
+      <form id="quick-form" class="quick-bar">
+        <span class="ico" aria-hidden="true">✨</span>
+        <input id="quick-text" placeholder="Jot anything: &quot;present databases next week&quot;, &quot;math exam 15/11 8:00&quot;..." aria-label="Quick note" required>
+        <button type="submit">Add</button>
+      </form>
+      <div class="cal-head">
+        <button id="cal-prev" class="ghost" aria-label="Previous month">‹</button>
+        <button id="cal-today" class="ghost">Today</button>
+        <button id="cal-next" class="ghost" aria-label="Next month">›</button>
+        <h2 id="cal-title">Month</h2>
+        <label class="toggle"><input type="checkbox" id="cal-show-classes" checked> Show classes</label>
+      </div>
+      <div class="cal-grid" id="cal-weekdays"></div>
+      <div class="cal-grid" id="cal-days"></div>
+      <div class="panel">
+        <h3>Coming up</h3>
+        <div id="upcoming"></div>
+      </div>
+    </section>
 
-    <main id="views">
-      <!-- DASHBOARD -->
-      <section class="view active" id="view-dashboard">
-        <h2>Good to see you.</h2>
-        <div class="stats">
-          <div class="stat"><span id="stat-subjects">0</span><label>Subjects</label></div>
-          <div class="stat"><span id="stat-notes">0</span><label>Notes</label></div>
-          <div class="stat"><span id="stat-cards">0</span><label>Flashcards</label></div>
-          <div class="stat"><span id="stat-quiz">0</span><label>Quizzes taken</label></div>
+    <!-- SUBJECTS -->
+    <section class="view" id="view-subjects">
+      <h2>Subjects</h2>
+      <div class="panel drop" id="scan-drop">
+        <strong>📸 Scan your timetable</strong>
+        <p>Drop a photo or screenshot of your timetable. The AI reads it and lets you check every subject before saving.</p>
+        <input type="file" id="scan-file" accept="image/*" aria-label="Timetable image">
+      </div>
+      <form id="subject-form" class="inline-form">
+        <input id="subject-name" placeholder="Or add one by hand" required>
+        <input id="subject-teacher" placeholder="Teacher (optional)">
+        <input id="subject-color" type="color" value="#007aff" aria-label="Subject color">
+        <button type="submit">Add</button>
+      </form>
+      <div id="subject-list" class="card-grid"></div>
+    </section>
+
+    <!-- NOTES -->
+    <section class="view" id="view-notes">
+      <h2>Notes</h2>
+      <div class="toolbar">
+        <select id="notes-filter-subject" aria-label="Filter by subject"><option value="">All subjects</option></select>
+        <input id="notes-search" placeholder="Search notes..." aria-label="Search notes">
+      </div>
+      <form id="note-form">
+        <select id="note-subject" required aria-label="Subject"></select>
+        <input id="note-title" placeholder="Note title" required>
+        <textarea id="note-content" placeholder="Write your study notes here..." required></textarea>
+        <button type="submit">Save note</button>
+      </form>
+      <div id="note-list"></div>
+    </section>
+
+    <!-- QUIZ -->
+    <section class="view" id="view-quiz">
+      <h2>Quiz</h2>
+      <div class="toolbar">
+        <select id="quiz-subject" aria-label="Quiz subject"></select>
+        <button id="quiz-start">Make me a quiz</button>
+      </div>
+      <p class="hint">Questions come from this subject's notes and teacher files.</p>
+      <div id="quiz-box"></div>
+      <div id="quiz-history"></div>
+    </section>
+
+    <!-- STUDY BUDDY (AI companion) -->
+    <section class="view" id="view-buddy">
+      <div class="buddy-head">
+        <div class="buddy" id="buddy-face" aria-hidden="true">🐣</div>
+        <div>
+          <h2>Hi, I'm Studay!</h2>
+          <p class="hint" id="buddy-mood">Throw me today's lesson and I'll read it for you.</p>
         </div>
-        <div class="grid2">
-          <div class="panel">
-            <h3>Quick add note</h3>
-            <form id="quick-note-form">
-              <select id="quick-note-subject" aria-label="Subject"></select>
-              <input id="quick-note-title" placeholder="Note title" required>
-              <textarea id="quick-note-content" placeholder="Jot it down fast..." required></textarea>
-              <button type="submit">Save + AI summarise</button>
-            </form>
-          </div>
-          <div class="panel">
-            <h3>Continue studying</h3>
-            <div id="recent-list"></div>
-            <h3 style="margin-top:1rem">Deadlines</h3>
-            <form id="deadline-form">
-              <input id="deadline-title" placeholder="e.g. Midterm - Databases" required>
-              <input id="deadline-date" type="date" required>
-              <button type="submit">Add</button>
-            </form>
-            <div id="deadline-list"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- SUBJECTS -->
-      <section class="view" id="view-subjects">
-        <h2>Subjects</h2>
-        <form id="subject-form" class="inline-form">
-          <input id="subject-name" placeholder="New subject name" required>
-          <input id="subject-color" type="color" value="#007aff" aria-label="Subject color">
-          <button type="submit">Add Subject</button>
+        <select id="buddy-subject" aria-label="Subject for files and questions"></select>
+      </div>
+      <div class="panel drop" id="mat-drop">
+        <strong>📄 Drop a teacher file</strong>
+        <p>PDF, slide screenshot or .txt. I'll summarise it and remember it for quizzes.</p>
+        <input type="file" id="mat-file" accept="application/pdf,image/*,.txt,.md,text/plain" aria-label="Teacher file">
+      </div>
+      <div id="mat-output"></div>
+      <div class="panel chat">
+        <div id="chat-log" aria-live="polite"></div>
+        <form id="chat-form">
+          <input id="chat-input" placeholder="Ask me anything about this subject..." aria-label="Ask the study buddy" required>
+          <button type="submit">Ask</button>
         </form>
-        <div id="subject-list" class="card-grid"></div>
-      </section>
+      </div>
+      <div class="panel">
+        <h3>Files I remember</h3>
+        <div id="mat-list"></div>
+      </div>
+    </section>
 
-      <!-- NOTES -->
-      <section class="view" id="view-notes">
-        <h2>Notes</h2>
-        <div class="toolbar">
-          <select id="notes-filter-subject" aria-label="Filter by subject"><option value="">All subjects</option></select>
-          <select id="notes-sort" aria-label="Sort notes">
-            <option value="new">Newest first</option>
-            <option value="old">Oldest first</option>
-            <option value="az">Title A-Z</option>
-          </select>
-          <button id="export-notes" class="ghost">Export JSON</button>
+    <!-- TIMER -->
+    <section class="view" id="view-timer">
+      <h2>Focus timer</h2>
+      <div class="panel timer-panel">
+        <div id="timer-display">25:00</div>
+        <div class="toolbar center">
+          <button data-mins="15" class="ghost">15m</button>
+          <button data-mins="25" class="ghost">25m</button>
+          <button data-mins="50" class="ghost">50m</button>
         </div>
-        <form id="note-form">
-          <select id="note-subject" required aria-label="Subject"></select>
-          <input id="note-title" placeholder="Note title" required>
-          <textarea id="note-content" placeholder="Write your study notes here..." required></textarea>
-          <button type="submit">Save Note</button>
-        </form>
-        <div id="note-list"></div>
-      </section>
-
-      <!-- FLASHCARDS -->
-      <section class="view" id="view-flashcards">
-        <h2>Flashcards</h2>
-        <div class="toolbar">
-          <select id="cards-filter-note" aria-label="Filter by deck"><option value="">All decks</option></select>
-          <button id="study-mode-btn">Study mode</button>
-          <button id="shuffle-cards" class="ghost">Shuffle</button>
+        <div class="toolbar center">
+          <button id="timer-start">Start</button>
+          <button id="timer-pause" class="ghost">Pause</button>
+          <button id="timer-reset" class="ghost">Reset</button>
         </div>
-        <div id="card-list" class="card-grid"></div>
-        <div id="study-mode" class="hidden panel">
-          <div id="study-card" class="flip-card"><div id="study-text">Press Next</div></div>
-          <div class="toolbar">
-            <button id="study-flip" class="ghost">Flip</button>
-            <button id="study-next" class="ghost">Next</button>
-            <button id="study-knew" class="ok">I knew it</button>
-            <button id="study-review" class="ghost">Review later</button>
-            <button id="study-exit" class="danger">Exit</button>
-          </div>
-          <div id="study-progress"></div>
-        </div>
-      </section>
-
-      <!-- QUIZ -->
-      <section class="view" id="view-quiz">
-        <h2>Quiz</h2>
-        <div class="toolbar">
-          <select id="quiz-note" aria-label="Quiz source note"></select>
-          <button id="quiz-start">Start quiz</button>
-        </div>
-        <div id="quiz-box"></div>
-        <div id="quiz-history"></div>
-      </section>
-
-      <!-- AI STUDIO -->
-      <section class="view" id="view-ai">
-        <h2>AI Studio</h2>
-        <div class="toolbar">
-          <select id="ai-note" aria-label="AI source note"></select>
-          <select id="ai-mode" aria-label="AI mode">
-            <option value="all">Summary + Flashcards + Quiz</option>
-            <option value="summary">Summary only</option>
-            <option value="flashcards">Flashcards only</option>
-            <option value="quiz">Quiz only</option>
-          </select>
-          <button id="ai-run">Generate</button>
-        </div>
-        <div class="panel">
-          <h3>Or paste any text</h3>
-          <textarea id="ai-paste" placeholder="Paste lecture text, article, anything..."></textarea>
-          <button id="ai-run-paste">Generate from pasted text</button>
-        </div>
-        <div id="ai-output"></div>
-      </section>
-
-      <!-- TIMER -->
-      <section class="view" id="view-timer">
-        <h2>Focus Timer</h2>
-        <div class="panel timer-panel">
-          <div id="timer-display">25:00</div>
-          <div class="toolbar" style="justify-content:center">
-            <button data-mins="15" class="ghost">15m</button>
-            <button data-mins="25" class="ghost">25m</button>
-            <button data-mins="50" class="ghost">50m</button>
-          </div>
-          <div class="toolbar" style="justify-content:center">
-            <button id="timer-start">Start</button>
-            <button id="timer-pause" class="ghost">Pause</button>
-            <button id="timer-reset" class="ghost">Reset</button>
-          </div>
-          <div id="timer-log"></div>
-        </div>
-      </section>
-    </main>
-  </div>
+        <div id="timer-log"></div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <div id="toast" role="status"></div>
 <div id="status-banner" class="hidden" role="alert"></div>
 
-<!-- Edit modal -->
-<div id="modal" class="hidden">
+<!-- Generic modal: review AI results, edit items -->
+<div id="modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal-box">
     <h3 id="modal-title">Edit</h3>
-    <input id="modal-field1" placeholder="Title / name">
-    <textarea id="modal-field2" placeholder="Content"></textarea>
+    <div id="modal-body"></div>
     <div class="toolbar">
       <button id="modal-save">Save</button>
       <button id="modal-cancel" class="ghost">Cancel</button>
