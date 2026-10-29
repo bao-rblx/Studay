@@ -121,6 +121,47 @@ test('AI: generates study aids from pasted text', async () => {
   assert.equal(res.body.flashcards, undefined);
 });
 
+test('AI quick note proposes an event without saving it', async () => {
+  const before = (await request(app).get('/api/events')).body.length;
+  const res = await request(app).post('/api/ai/quick-note').send({ text: 'present databases next week', today: '2025-11-05' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.event.kind, 'presentation');
+  assert.equal(res.body.event.event_date, '2025-11-10');
+  assert.equal((await request(app).get('/api/events')).body.length, before);
+  assert.equal((await request(app).post('/api/ai/quick-note').send({ text: ' ' })).status, 400);
+});
+
+test('AI uploads are validated', async () => {
+  const bad = await request(app).post('/api/ai/scan-timetable').send({ file: { mime_type: 'text/html', data: 'AAAA' } });
+  assert.equal(bad.status, 400);
+  const pdf = await request(app).post('/api/ai/scan-timetable').send({ file: { mime_type: 'application/pdf', data: 'AAAA' } });
+  assert.equal(pdf.status, 400);
+  const notB64 = await request(app).post('/api/ai/read-material').send({ file: { mime_type: 'image/png', data: '<script>' } });
+  assert.equal(notB64.status, 400);
+  const ok = await request(app).post('/api/ai/scan-timetable').send({ file: { mime_type: 'image/png', data: 'AAAA' } });
+  assert.equal(ok.status, 200);
+  assert.ok(Array.isArray(ok.body.subjects));
+});
+
+test('AI read material, ask and quiz use saved study material', async () => {
+  const subject = (await request(app).post('/api/subjects').send({ name: 'Biology' })).body;
+  const read = await request(app).post('/api/ai/read-material').send({ text: NOTE_TEXT, filename: 'week1.txt' });
+  assert.equal(read.status, 200);
+  assert.ok(read.body.summary);
+  await request(app).post('/api/materials').send({ subject_id: subject.id, title: read.body.title, content: read.body.content, summary: read.body.summary });
+
+  const ask = await request(app).post('/api/ai/ask').send({ question: 'What does chlorophyll absorb?', subject_id: subject.id });
+  assert.equal(ask.status, 200);
+  assert.match(ask.body.answer, /Chlorophyll/);
+  assert.equal((await request(app).post('/api/ai/ask').send({})).status, 400);
+
+  const quiz = await request(app).post('/api/ai/quiz').send({ subject_id: subject.id });
+  assert.equal(quiz.status, 200);
+  assert.ok(quiz.body.quiz.length > 0);
+  const empty = (await request(app).post('/api/subjects').send({ name: 'Empty' })).body;
+  assert.equal((await request(app).post('/api/ai/quiz').send({ subject_id: empty.id })).status, 400);
+});
+
 test('AI: too-short text and unknown note are rejected', async () => {
   assert.equal((await request(app).post('/api/ai/generate').send({ content: 'short' })).status, 400);
   assert.equal((await request(app).post('/api/ai/generate').send({ note_id: 424242 })).status, 404);
