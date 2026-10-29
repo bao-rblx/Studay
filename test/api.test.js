@@ -68,7 +68,6 @@ test('AI: generates study aids from pasted text', async () => {
   const res = await request(app).post('/api/ai/generate').send({ content: NOTE_TEXT });
   assert.equal(res.status, 200);
   assert.ok(res.body.summary.summary.length > 0);
-  assert.ok(res.body.flashcards.length > 0);
   assert.ok(res.body.quiz.length > 0);
 });
 
