@@ -148,31 +148,6 @@ function createApp({ pool, ai = {} }) {
     res.json({ deleted: true });
   }));
 
-  // --- Flashcards ---
-  app.get('/api/flashcards', wrap(async (req, res) => {
-    const { note_id } = req.query;
-    if (note_id && !isId(note_id)) return res.status(400).json({ error: 'invalid note_id' });
-    res.json(note_id
-      ? await q('SELECT * FROM flashcards WHERE note_id = $1 ORDER BY created_at DESC, id DESC', [note_id])
-      : await q('SELECT * FROM flashcards ORDER BY created_at DESC, id DESC'));
-  }));
-  app.post('/api/flashcards', wrap(async (req, res) => {
-    const { note_id, front, back } = req.body || {};
-    if (!note_id || !front || !back) return res.status(400).json({ error: 'note_id, front, back required' });
-    if (!isId(note_id) || !(await one('SELECT id FROM notes WHERE id = $1', [note_id]))) {
-      return res.status(400).json({ error: 'note does not exist' });
-    }
-    res.status(201).json(await one(
-      'INSERT INTO flashcards (note_id, front, back) VALUES ($1, $2, $3) RETURNING *',
-      [note_id, front, back],
-    ));
-  }));
-  app.delete('/api/flashcards/:id', wrap(async (req, res) => {
-    const rows = await q('DELETE FROM flashcards WHERE id = $1 RETURNING id', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'flashcard not found' });
-    res.json({ deleted: true });
-  }));
-
   // --- Calendar events ---
   // Always send event_date as 'YYYY-MM-DD'. Real Postgres already does (type parser in db.js);
   // pg-mem in the tests returns a Date at UTC midnight.
