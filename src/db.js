@@ -1,7 +1,11 @@
 // Database access layer: PostgreSQL connection pool and schema migration.
 const fs = require('fs');
 const path = require('path');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Return DATE columns as 'YYYY-MM-DD' strings. The default turns them into a JS Date at
+// local midnight, which shifts the day by one once it is serialised to UTC JSON.
+types.setTypeParser(1082, (v) => v);
 
 function createPool(env = process.env) {
   if (!env.DATABASE_URL) {
