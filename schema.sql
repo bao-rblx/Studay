@@ -22,14 +22,8 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS flashcards (
-  id         SERIAL PRIMARY KEY,
-  note_id    INTEGER     NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-  front      TEXT        NOT NULL,
-  back       TEXT        NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
+-- Flashcards were replaced by quizzes.
+DROP TABLE IF EXISTS flashcards;
 
 -- Calendar entries: deadlines, exams, presentations... One row per day.
 CREATE TABLE IF NOT EXISTS events (
@@ -57,6 +51,5 @@ CREATE TABLE IF NOT EXISTS materials (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_subject_id ON notes (subject_id);
-CREATE INDEX IF NOT EXISTS idx_flashcards_note_id ON flashcards (note_id);
 CREATE INDEX IF NOT EXISTS idx_events_event_date ON events (event_date);
 CREATE INDEX IF NOT EXISTS idx_materials_subject_id ON materials (subject_id);
