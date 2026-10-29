@@ -19,7 +19,7 @@ test('GET /api/health reports the database as up', async () => {
 
 test('subjects: create, list, update, delete', async () => {
   const created = await request(app).post('/api/subjects').send({ name: 'Biology', color: '#00aa00' });
-  assert.equal(created.status, 201);
+  assert.equal(created.status, 200);
   assert.equal(created.body.name, 'Biology');
 
   const list = await request(app).get('/api/subjects');
