@@ -4,6 +4,17 @@ const {
   wrap, isId, isDate, clean, checkUpload,
   AI_MIN_CHARS, AI_MAX_CHARS, MATERIAL_MAX_CHARS, QUESTION_MAX_CHARS,
 } = require('../lib/helpers');
+const { extractText } = require('../files');
+
+// What the student can actually drop, spelled out in the language of the UI.
+const FILE_HINT = 'Word (.docx), PowerPoint (.pptx), Excel (.xlsx), PDF, image or text';
+// The local extractor reports a code; each one becomes a sentence the student can act on.
+const FILE_ERRORS = {
+  UNSUPPORTED: `unsupported file type - drop ${FILE_HINT}`,
+  TOO_LARGE: 'file too large (max 20 MB)',
+  BAD_ZIP: 'that document looks damaged - save it again from Word, PowerPoint or Excel',
+  EMPTY: 'no readable text in that file - is it a scan of a page?',
+};
 
 module.exports = ({ q, one, AI }) => {
   const router = express.Router();
@@ -44,17 +55,45 @@ module.exports = ({ q, one, AI }) => {
   }));
 
   // Teacher file -> extracted text + summary. The page shows it, then saves via
-  // POST /api/materials. Plain text arrives in `text`; binary types are sent to Gemini.
+  // POST /api/materials. Text and Office documents are read locally, so a Word or Excel
+  // file works without an AI key; only images and PDFs still need the vision model.
+  // `extractor` says which path read the file (the AI's own `source` field already means
+  // "gemini or offline helper", so these cannot share a name).
   router.post('/ai/read-material', wrap(async (req, res) => {
-    const { file, text, filename } = req.body || {};
+    const { file, text, filename: bodyFilename } = req.body || {};
+    // New clients send file.name; older ones sent a top-level filename.
+    const filename = clean(file && file.name) || clean(bodyFilename);
+
     if (file) {
-      const bad = checkUpload(file);
-      if (bad) return res.status(400).json({ error: bad });
-      return res.json(await AI.readMaterial({ mimeType: file.mime_type, data: file.data, filename }));
+      if (typeof file.data !== 'string' || !file.data) {
+        return res.status(400).json({ error: 'file.data (base64) required' });
+      }
+      let local;
+      try {
+        local = extractText({ filename, mimeType: file.mime_type, buffer: file.data });
+      } catch (err) {
+        return res.status(400).json({ error: FILE_ERRORS[err.code] || `could not read that file - drop ${FILE_HINT}` });
+      }
+      if (local.kind === 'binary') {
+        // PDFs and photos keep the original vision path, including its upload checks.
+        const bad = checkUpload(file);
+        if (bad) return res.status(400).json({ error: bad });
+        const out = await AI.readMaterial({ mimeType: file.mime_type, data: file.data, filename });
+        return res.json({ ...out, extractor: 'gemini', kind: local.kind, chars: null, truncated: false, filename });
+      }
+      // A short file is not an error: the AI helper simply returns no summary for it, and the
+      // text is still worth saving. Only "no text at all" is refused (EMPTY above).
+      const out = await AI.readMaterial({ text: local.text, filename });
+      const { kind, truncated } = local.meta;
+      return res.json({
+        ...out, extractor: 'local', kind, chars: local.text.length, truncated, filename,
+      });
     }
+
     const t = String(text || '').trim();
     if (t.length < AI_MIN_CHARS) return res.status(400).json({ error: 'file or text (at least a paragraph) required' });
-    res.json(await AI.readMaterial({ text: t.slice(0, MATERIAL_MAX_CHARS), filename }));
+    const out = await AI.readMaterial({ text: t.slice(0, MATERIAL_MAX_CHARS), filename });
+    res.json({ ...out, extractor: 'local', kind: 'text', chars: t.length, truncated: false, filename });
   }));
 
   // Companion chat, grounded in this account's notes and materials (or one subject).

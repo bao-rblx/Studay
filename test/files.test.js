@@ -1,62 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const zlib = require('node:zlib');
 const { extractText, isSupported, SUPPORTED_EXTENSIONS, MAX_BYTES, MAX_TEXT } = require('../src/files');
-
-// --- tiny ZIP writer, so the tests need no binary fixtures ------------------
-// `fakeUncompressed` overrides the size declared in the headers (zip-bomb case).
-function writeZip(entries, { fakeUncompressed = {} } = {}) {
-  const parts = [];
-  const directory = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const name = Buffer.from(entry.name, 'utf8');
-    const raw = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data, 'utf8');
-    const body = entry.store ? raw : zlib.deflateRawSync(raw);
-    const declared = fakeUncompressed[entry.name] ?? raw.length;
-
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0x0800, 6); // names are UTF-8
-    local.writeUInt16LE(entry.store ? 0 : 8, 8);
-    local.writeUInt32LE(body.length, 18);
-    local.writeUInt32LE(declared, 22);
-    local.writeUInt16LE(name.length, 26);
-    parts.push(local, name, body);
-
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(0x0800, 8);
-    central.writeUInt16LE(entry.store ? 0 : 8, 10);
-    central.writeUInt32LE(body.length, 20);
-    central.writeUInt32LE(declared, 24);
-    central.writeUInt16LE(name.length, 28);
-    central.writeUInt32LE(offset, 42);
-    directory.push(central, name);
-
-    offset += 30 + name.length + body.length;
-  }
-  const cd = Buffer.concat(directory);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
-  end.writeUInt32LE(cd.length, 12);
-  end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...parts, cd, end]);
-}
-
-const para = (text) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`;
-const docx = (body, extra = []) => writeZip([
-  { name: '[Content_Types].xml', data: '<Types/>' },
-  { name: 'word/document.xml', data: `<w:document><w:body>${body}</w:body></w:document>` },
-  ...extra,
-]);
-const slide = (text) => `<p:sld><p:cSld><a:p><a:r><a:t>${text}</a:t></a:r></a:p></p:cSld></p:sld>`;
-const notes = (text) => `<p:notes><a:p><a:r><a:t>${text}</a:t></a:r></a:p></p:notes>`;
+const { writeZip, docx, para, slide, notes } = require('./office-fixture');
 
 // --- plain text -------------------------------------------------------------
 test('plain text, csv and markdown are read as UTF-8', () => {
