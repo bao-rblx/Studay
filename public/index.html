@@ -6,9 +6,28 @@
 <meta name="theme-color" content="#007aff">
 <title>Studay - AI Study Companion</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="feature-files.css">
+<link rel="stylesheet" href="feature-quiz.css">
+<link rel="stylesheet" href="feature-search.css">
 </head>
 <body>
 <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+<!-- Sign in / create account. Shown by app.js until the session cookie checks out. -->
+<div id="auth-screen" class="auth-screen hidden">
+  <form id="auth-form" class="auth-card" novalidate>
+    <div class="rail-logo auth-logo" aria-hidden="true">S</div>
+    <h1 id="auth-title">Sign in to Studay</h1>
+    <p class="hint" id="auth-hint">Your subjects, notes and deadlines follow you to every device.</p>
+    <label>Email<input id="auth-email" type="email" autocomplete="username" placeholder="you@example.com" required></label>
+    <label>Password<input id="auth-password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required minlength="8"></label>
+    <label id="auth-name-row" class="hidden">Your name<input id="auth-name" autocomplete="name" placeholder="Shown in the app"></label>
+    <p id="auth-error" class="auth-error hidden" role="alert"></p>
+    <button id="auth-submit" type="submit">Sign in</button>
+    <button id="auth-switch" type="button" class="ghost">Create an account</button>
+  </form>
+</div>
+
 <div class="app">
   <!-- Minimal icon rail -->
   <nav class="rail" aria-label="Main">
@@ -27,6 +46,12 @@
   </nav>
 
   <main id="views">
+    <!-- Global bar: search slot (search wave) and the signed-in account chip -->
+    <div class="topbar">
+      <div id="global-search-slot" class="search-slot"></div>
+      <div id="user-slot" class="user-slot"></div>
+    </div>
+
     <!-- CALENDAR (dashboard) -->
     <section class="view active" id="view-calendar">
       <form id="quick-form" class="quick-bar">
@@ -52,6 +77,7 @@
     <!-- SUBJECTS -->
     <section class="view" id="view-subjects">
       <h2>Subjects</h2>
+      <div id="subject-actions-slot"></div>
       <div class="panel drop" id="scan-drop">
         <strong>📸 Scan your timetable</strong>
         <p>Drop a photo or screenshot of your timetable. The AI reads it and lets you check every subject before saving.</p>
@@ -104,12 +130,15 @@
         </div>
         <select id="buddy-subject" aria-label="Subject for files and questions"></select>
       </div>
-      <div class="panel drop" id="mat-drop">
-        <strong>📄 Drop a teacher file</strong>
-        <p>PDF, slide screenshot or .txt. I'll summarise it and remember it for quizzes.</p>
-        <input type="file" id="mat-file" accept="application/pdf,image/*,.txt,.md,text/plain" aria-label="Teacher file">
+      <!-- The file wave replaces this slot with its own drop panel and preview -->
+      <div id="files-slot">
+        <div class="panel drop" id="mat-drop">
+          <strong>📄 Drop a teacher file</strong>
+          <p>PDF, slide screenshot or .txt. I'll summarise it and remember it for quizzes.</p>
+          <input type="file" id="mat-file" accept="application/pdf,image/*,.txt,.md,text/plain" aria-label="Teacher file">
+        </div>
+        <div id="mat-output"></div>
       </div>
-      <div id="mat-output"></div>
       <div class="panel chat">
         <div id="chat-log" aria-live="polite"></div>
         <form id="chat-form">
@@ -160,5 +189,8 @@
 </div>
 
 <script src="app.js"></script>
+<script src="feature-files.js"></script>
+<script src="feature-quiz.js"></script>
+<script src="feature-search.js"></script>
 </body>
 </html>
