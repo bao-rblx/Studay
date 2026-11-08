@@ -64,15 +64,39 @@ test('Vietnamese material yields questions that keep the diacritics', () => {
   }
 });
 
-test('thin material is padded with self-check cards, never faked', () => {
-  const oneFact = 'Quang hợp là quá trình thực vật sử dụng ánh sáng mặt trời để tổng hợp chất hữu cơ.';
-  const { questions } = buildQuiz(oneFact, { count: 6, seed: 2 });
-  assert.equal(questions.length, 6);
-  assert.ok(graded(questions).length >= 1 && graded(questions).length < 6);
+test('thin material gives fewer questions, never fragment self-checks', () => {
+  // Two facts in, so two questions out - padding them up to eight would mean inventing prompts.
+  const twoFacts = 'Quang hợp là quá trình thực vật sử dụng ánh sáng mặt trời để tổng hợp chất hữu cơ. '
+    + 'Diệp lục trong lá hấp thụ chủ yếu ánh sáng đỏ và ánh sáng xanh tím.';
+  const { questions } = buildQuiz(twoFacts, { count: 8, seed: 2 });
+  assert.ok(questions.length >= 1 && questions.length <= 8);
+  assert.ok(questions.length < 8, 'thin material must not be padded to the requested count');
   for (const question of questions.filter((q) => q.type === 'selfCheck')) {
     assert.match(question.prompt, /^Explain: \S/);
+    const term = question.prompt.replace('Explain: ', '');
+    // A card may only ask about a phrase that is really in the notes - "Explain: Chuan" is not it.
+    assert.ok(term.includes(' '), `fragment prompt: ${question.prompt}`);
+    assert.ok(twoFacts.toLowerCase().includes(term.toLowerCase()), `invented term: ${term}`);
     assert.ok(question.answer.length > 0);
   }
+});
+
+test('a term repeated in one sentence leaves exactly one blank', () => {
+  // "dữ liệu" appears twice in the first sentence; blanking both read as a broken sentence.
+  const doubled = 'Dữ liệu dư thừa trong cơ sở dữ liệu làm câu truy vấn chậm và khó kiểm tra. '
+    + 'Chuẩn hóa giúp loại bỏ dữ liệu dư thừa nên cơ sở dữ liệu nhẹ và rõ ràng hơn.';
+  const { questions } = buildQuiz(doubled, { count: 6, seed: 1 });
+  assert.ok(questions.length > 0);
+  for (const question of questions) {
+    const blanks = question.prompt.split('_____').length - 1;
+    assert.ok(blanks <= 1, `blanked twice: ${question.prompt}`);
+    if (question.type !== 'selfCheck') assert.equal(blanks, 1, `no blank: ${question.prompt}`);
+  }
+  const first = graded(questions)[0];
+  assert.equal(first.answer.toLowerCase(), 'dư thừa');
+  // The untouched copies of the repeated word stay in the stem, and the answer is not printed.
+  assert.equal((first.prompt.match(/dữ liệu/giu) || []).length, 2, first.prompt);
+  assert.ok(!first.prompt.toLowerCase().includes(first.answer.toLowerCase()), first.prompt);
 });
 
 test('short, garbage or thin input never throws', () => {
@@ -84,10 +108,16 @@ test('short, garbage or thin input never throws', () => {
   assert.deepEqual(buildQuiz(42), empty);
   assert.deepEqual(buildQuiz('x'.repeat(300)), empty);
   assert.deepEqual(buildQuiz('!!! ??? --- ... '.repeat(8)), empty);
-  // count is clamped, and the text decides the real ceiling.
+});
+
+test('the requested count is a ceiling, never exceeded', () => {
+  assert.equal(buildQuiz(TEXT, { count: 2, seed: 3 }).questions.length, 2);
   assert.equal(buildQuiz(TEXT, { count: 0, seed: 1 }).questions.length, 1);
   assert.equal(buildQuiz(TEXT, { count: -5, seed: 1 }).questions.length, 1);
-  assert.ok(buildQuiz(TEXT, { count: 500, seed: 1 }).questions.length <= 20);
+  for (const count of [1, 3, 5, 8, 12, 40]) {
+    const { questions } = buildQuiz(TEXT, { count, seed: 4 });
+    assert.ok(questions.length <= count, `asked for ${count}, got ${questions.length}`);
+  }
 });
 
 // --- grading ---------------------------------------------------------------

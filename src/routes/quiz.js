@@ -99,7 +99,10 @@ module.exports = ({ q, one, AI }) => {
     }
     const quiz = await assemble(found.text, want, seed);
     if (!quiz.questions.length) {
-      return { status: 400, body: { error: 'could not write questions from this material - add a longer note or file' } };
+      return {
+        status: 400,
+        body: { error: 'could not write questions from this material - add a longer note or file' },
+      };
     }
     return {
       status: 200,

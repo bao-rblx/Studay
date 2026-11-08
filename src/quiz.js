@@ -31,9 +31,24 @@ const VI_STOPWORDS = 'và,là,của,có,cho,các,những,một,trong,để,khi,t
   + 'đâu,thế,vậy,chúng,ta,tôi,bạn,anh,chị,em,họ,nó,làm,người,cái,con,việc,điều,vẫn,đều,chính,ngay,'
   + 'hãy,đừng,chưa,không,phải,biết,thấy,muốn,cần,nữa,rằng,thành,nhờ,vừa,mới,nhất';
 const STOPWORDS = new Set([...EN_STOPWORDS.split(','), ...VI_STOPWORDS.split(',')]);
+// Students often type Vietnamese without diacritics ("chuan hoa", "la qua trinh"). Folding both
+// sides means one stopword list covers "là" and "la" instead of silently matching nothing.
+const MARKS = /\p{M}+/gu;
+const fold = (value) => String(value === undefined || value === null ? '' : value)
+  .normalize('NFD')
+  .replace(MARKS, '')
+  .replace(/[đĐ]/g, 'd')
+  .toLowerCase();
+const STOPWORDS_FOLDED = new Set([...STOPWORDS].map(fold));
+// A token that carries diacritics is compared as written ("khí" is gas, not the word "khi");
+// only text typed without them falls back to the folded list.
+const isStopword = (token) => (token === fold(token) ? STOPWORDS_FOLDED.has(token) : STOPWORDS.has(token));
+// Function words that start a phrase, never a term: "tren cot" is "on the column", not a word.
+const LINKERS = new Set('trong,tren,duoi,cua,cho,voi,tu,den,tai,ve,qua,sau,truoc,ngoai,giua,len,xuong,o'
+  .split(','));
+const isLinker = (token) => LINKERS.has(fold(token));
 
 const WORD = /[\p{L}\p{N}]+(?:['\u2019-][\p{L}\p{N}]+)*/gu;
-const MARKS = /\p{M}+/gu;
 // Vietnamese identity marks survive NFD as combining characters (circumflex, breve, horn, đ),
 // which catches "ợ"/"ặ" that a plain character class would miss.
 const VIETNAMESE = /[\u0302\u0306\u031bđ]/u;
@@ -72,14 +87,7 @@ function termRe(term, flags = 'giu') {
 // Grading is forgiving: case, extra spaces, punctuation and Vietnamese diacritics are all
 // ignored, because typing them perfectly is not what the quiz is testing.
 function normalizeAnswer(value) {
-  return String(value === undefined || value === null ? '' : value)
-    .normalize('NFD')
-    .replace(MARKS, '')
-    .replace(/[đĐ]/g, 'd')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
+  return fold(value).replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
 }
 
 // --- text analysis ---------------------------------------------------------
@@ -95,7 +103,7 @@ function splitSentences(text) {
 }
 
 function isKeyToken(token) {
-  return token.length >= 3 && token.length <= MAX_TERM && /\p{L}{2,}/u.test(token) && !STOPWORDS.has(token);
+  return token.length >= 3 && token.length <= MAX_TERM && /\p{L}{2,}/u.test(token) && !isStopword(token);
 }
 
 // One Vietnamese syllable: short, but it may be half of a real word.
@@ -103,22 +111,24 @@ const isSyllable = (token) => token.length >= 2 && token.length <= 6 && /\p{L}{2
 
 // Key terms of the whole text, best first: repeated words beat one-off words, and a whole
 // phrase beats the pieces inside it ("ánh sáng" before "ánh").
+// Returns `terms` (safe to blank out and to ask about) and `nameable`, which says whether a
+// term can be explained on a self-check card.
 function keyTerms(text, sentences) {
   const counts = new Map();
   const pairs = new Map();
   const leftOf = new Map();
   const rightOf = new Map();
-  const bump = (term, n = 1) => counts.set(term, (counts.get(term) || 0) + n);
+  const bump = (term) => counts.set(term, (counts.get(term) || 0) + 1);
   const note = (map, token, neighbour) => {
     if (!map.has(token)) map.set(token, new Set());
     map.get(token).add(neighbour);
   };
   const vietnamese = looksVietnamese(text);
+  const keyTokens = [];
+  const tokenised = sentences.map((sentence) => words(sentence).map((w) => w.toLowerCase()));
 
-  for (const sentence of sentences) {
-    const tokens = words(sentence).map((w) => w.toLowerCase());
-    for (const token of tokens) if (isKeyToken(token)) bump(token);
-    if (!vietnamese) continue;
+  for (const tokens of tokenised) {
+    for (const token of tokens) if (isKeyToken(token)) keyTokens.push(token);
     for (let i = 0; i < tokens.length; i += 1) {
       // '' marks a sentence edge, so a pair never spans two unrelated facts.
       note(leftOf, tokens[i], i === 0 ? '' : tokens[i - 1]);
@@ -129,18 +139,38 @@ function keyTerms(text, sentences) {
       }
     }
   }
-  // A syllable that always sits next to another word is only half of that word.
-  const standalone = (token, map) => [...(map.get(token) || [])].every((n) => n === '' || !isKeyToken(n));
-  if (vietnamese) {
-    // Vietnamese words are two syllables written apart, so half a word ("sáng" out of "ánh sáng")
-    // makes a poor question. Keep a pair when it repeats, or when both syllables are only ever
-    // seen together and neither is glued to another word ("quang hợp" vs. "thụ chủ" cut out of
-    // "hấp thụ chủ yếu").
-    for (const [pair, n] of pairs) {
-      const [a, b] = pair.split(' ');
-      const glued = rightOf.get(a).size === 1 && rightOf.get(a).has(b)
-        && leftOf.get(b).size === 1 && leftOf.get(b).has(a);
-      if (n >= 2 || (glued && standalone(a, leftOf) && standalone(b, rightOf))) bump(pair, n);
+  // Vietnamese typed without diacritics looks like a stream of short words, which no character
+  // test can recognise - but it behaves exactly like Vietnamese: two tokens, one word. English
+  // study notes are full of long words (photosynthesis, chlorophyll), so this stays off there.
+  const shortWords = keyTokens.filter((t) => t.length <= 4).length;
+  const syllables = vietnamese || (keyTokens.length > 6 && shortWords / keyTokens.length >= 0.6);
+
+  // A syllable that always sits next to another word is only half of that word ("thua" in
+  // "du thua"). Function words and sentence edges are boundaries, content words are not.
+  const standalone = (token, map) => [...(map.get(token) || [])]
+    .every((n) => n === '' || !isSyllable(n) || isStopword(n));
+  // Two short tokens written apart are often one word ("ánh" + "sáng" = "ánh sáng"), and a whole
+  // phrase makes a far better question than either half. The evidence: the pair repeats, or both
+  // halves are sealed by a function word so it cannot be a piece of something longer.
+  const wordPair = (a, b) => {
+    if (!isSyllable(a) || !isSyllable(b) || !(isKeyToken(a) || isKeyToken(b))) return false;
+    const n = pairs.get(`${a} ${b}`) || 0;
+    if (n < 2 && isLinker(a)) return false; // "tren cot", "cho cay": a phrase, not a term
+    return n >= 2 || (standalone(a, leftOf) && standalone(b, rightOf));
+  };
+  // Walk each sentence once, taking a two-token word when the evidence supports it and one token
+  // otherwise. Overlapping candidates are impossible this way, so a word can never be cut in half
+  // ("trình loại" out of "quá trình loại bỏ").
+  for (const tokens of tokenised) {
+    for (let i = 0; i < tokens.length;) {
+      const [a, b] = [tokens[i], tokens[i + 1]];
+      if (syllables && b && wordPair(a, b)) {
+        bump(`${a} ${b}`);
+        i += 2;
+      } else {
+        if (isKeyToken(a)) bump(a);
+        i += 1;
+      }
     }
   }
 
@@ -155,13 +185,15 @@ function keyTerms(text, sentences) {
   // A bare three-letter syllable ("hợp", "mặt") is too little to ask about: as an option it
   // reads like a typo, as an answer it is guesswork.
   const usable = kept.filter((term) => term.includes(' ') || term.length >= MIN_TERM);
-  // Vietnamese options should be whole words, not syllables cut out of one ("Phóng" out of
-  // "giải phóng"). Dense single-sentence notes have no such words, so fall back instead of
-  // returning nothing.
-  const clean = vietnamese
+  // Options should be whole words, not syllables cut out of one ("Phóng" out of "giải phóng",
+  // "Trinh" out of "quá trình"). Fewer questions is fine; half a word never is.
+  const terms = (syllables
     ? usable.filter((term) => term.includes(' ') || (standalone(term, leftOf) && standalone(term, rightOf)))
-    : usable;
-  return (clean.length >= 4 ? clean : usable).slice(0, 80);
+    : usable).slice(0, 80);
+  // A self-check card asks the student to explain something, so the term has to be nameable.
+  // In a syllable language that means a whole phrase: "du lieu", never the "lieu" inside it.
+  const nameable = (term) => (syllables ? term.includes(' ') : term.length >= MIN_TERM);
+  return { terms, nameable };
 }
 
 // First surface form of the term in the text, so answers keep the original casing.
@@ -170,11 +202,12 @@ function surfaceOf(text, term) {
   return match ? match[0] : '';
 }
 
-// Replace every occurrence of the term with the blank, so a repeated word cannot leak the answer.
+// Blank the first occurrence only: two blanks in one stem read as a broken sentence.
 function masked(sentence, term) {
-  if (!termRe(term, 'iu').test(sentence)) return '';
-  const stem = sentence.replace(termRe(term), BLANK);
-  // "light" is still handed out for free when the stem keeps the word "sunlight".
+  const match = termRe(term, 'iu').exec(sentence);
+  if (!match) return '';
+  const stem = sentence.slice(0, match.index) + BLANK + sentence.slice(match.index + match[0].length);
+  // A stem that still prints the word - a repeat, or "light" inside "sunlight" - gives it away.
   if (stem.toLowerCase().includes(term.toLowerCase())) return '';
   return stem.length >= MIN_PROMPT ? stem : '';
 }
@@ -245,7 +278,7 @@ function buildQuiz(text, { count = 8, seed = 1 } = {}) {
   try {
     const rng = mulberry32(Number.isFinite(Number(seed)) ? Math.trunc(Number(seed)) : 1);
     const sentences = splitSentences(source);
-    const terms = keyTerms(source, sentences);
+    const { terms, nameable } = keyTerms(source, sentences);
     if (!sentences.length || !terms.length) return empty;
 
     const questions = [];
@@ -267,15 +300,16 @@ function buildQuiz(text, { count = 8, seed = 1 } = {}) {
       questions.push(question);
     }
 
-    // Too few facts for a full quiz: top up with self-check cards. They are never graded,
-    // so reusing a sentence is fine and the page still has something to work through.
+    // Still short of the requested count? Add self-check cards, but only for terms a student can
+    // actually explain. If there are none, hand back the real questions only: a quiz of invented
+    // prompts teaches nothing, and the page copes with any length.
     for (const term of terms) {
       if (questions.length >= want) break;
-      if (usedTerms.has(term)) continue;
+      if (usedTerms.has(term) || !nameable(term)) continue;
       const sentence = sentences.find((s) => termRe(term, 'iu').test(s));
       const answer = surfaceOf(sentence || source, term);
       if (!answer) continue;
-      const prompt = `Explain: ${answer}`;
+      const prompt = `Explain: ${capFirst(answer)}`;
       if (usedPrompts.has(normalizeAnswer(prompt))) continue;
       usedTerms.add(term);
       usedPrompts.add(normalizeAnswer(prompt));
