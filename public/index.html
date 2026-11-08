@@ -77,18 +77,13 @@
     <!-- SUBJECTS -->
     <section class="view" id="view-subjects">
       <h2>Subjects</h2>
+      <!-- "New subject" button, filled by feature-search.js: adding a subject opens a dialog -->
       <div id="subject-actions-slot"></div>
       <div class="panel drop" id="scan-drop">
         <strong>📸 Scan your timetable</strong>
         <p>Drop a photo or screenshot of your timetable. The AI reads it and lets you check every subject before saving.</p>
         <input type="file" id="scan-file" accept="image/*" aria-label="Timetable image">
       </div>
-      <form id="subject-form" class="inline-form">
-        <input id="subject-name" placeholder="Or add one by hand" required>
-        <input id="subject-teacher" placeholder="Teacher (optional)">
-        <input id="subject-color" type="color" value="#007aff" aria-label="Subject color">
-        <button type="submit">Add</button>
-      </form>
       <div id="subject-list" class="card-grid"></div>
     </section>
 
@@ -130,15 +125,8 @@
         </div>
         <select id="buddy-subject" aria-label="Subject for files and questions"></select>
       </div>
-      <!-- The file wave replaces this slot with its own drop panel and preview -->
-      <div id="files-slot">
-        <div class="panel drop" id="mat-drop">
-          <strong>📄 Drop a teacher file</strong>
-          <p>PDF, slide screenshot or .txt. I'll summarise it and remember it for quizzes.</p>
-          <input type="file" id="mat-file" accept="application/pdf,image/*,.txt,.md,text/plain" aria-label="Teacher file">
-        </div>
-        <div id="mat-output"></div>
-      </div>
+      <!-- Filled by feature-files.js: drop panel, read report, save to subject -->
+      <div id="files-slot"></div>
       <div class="panel chat">
         <div id="chat-log" aria-live="polite"></div>
         <form id="chat-form">

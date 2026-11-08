@@ -25,7 +25,7 @@ module.exports = [
         go: 'readonly', refresh: 'readonly', openModal: 'readonly', closeModal: 'readonly',
         addXP: 'readonly', mood: 'readonly', buddySubject: 'readonly', summaryHtml: 'readonly',
         aiNotice: 'readonly', aiSource: 'readonly', readAsBase64: 'readonly',
-        isTextFile: 'readonly', wireDrop: 'readonly', UPLOAD_MAX: 'readonly', ymd: 'readonly',
+        wireDrop: 'readonly', UPLOAD_MAX: 'readonly', ymd: 'readonly',
         pad: 'readonly', DAY_SHORT: 'readonly', KINDS: 'readonly', KIND_ICON: 'readonly',
         PALETTE: 'readonly', showBanner: 'readonly', hideBanner: 'readonly',
       },

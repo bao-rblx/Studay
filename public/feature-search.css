@@ -1,8 +1,5 @@
 /* Search + subject dialog styles. Owned by the search wave. */
 
-/* The old three-field subject form is replaced by the dialog in feature-search.js. */
-#subject-form { display: none; }
-
 /* ---------- top-bar search ---------- */
 .gs { position: relative; display: flex; align-items: center; }
 .gs-ico { position: absolute; left: .85rem; font-size: .95rem; pointer-events: none; opacity: .65; }

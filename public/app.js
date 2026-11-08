@@ -223,7 +223,6 @@ function readAsBase64(file) {
     r.readAsDataURL(file);
   });
 }
-const isTextFile = (f) => f.type.startsWith('text/') || /\.(txt|md)$/i.test(f.name);
 // Let a .drop panel accept dragged files as well as the file picker.
 function wireDrop(panel, input, handler) {
   if (!panel || !input) return;
@@ -442,12 +441,8 @@ wireDrop($('scan-drop'), $('scan-file'), async (file) => {
     addXP(5 * list.length); toast(`${list.length} subjects added`); refresh();
   }, 'Save subjects');
 });
-$('subject-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  await send('/api/subjects', { name: $('subject-name').value, teacher: $('subject-teacher').value, color: $('subject-color').value });
-  $('subject-name').value = ''; $('subject-teacher').value = '';
-  addXP(5); toast('Subject added +5 XP'); refresh();
-});
+// Adding and editing a subject happens in the dialog owned by feature-search.js
+// (window.editSubject is replaced there); there is no inline form any more.
 function editSubject(id) {
   const s = subjectOf(id);
   if (!s) return;
@@ -567,7 +562,7 @@ function renderTimerLog() { $('timer-log').innerHTML = store.get('sd_timers', []
 const Studay = {
   $, esc, api, send, toast, busy, store, state, subjectOf, go, refresh, openModal, closeModal,
   addXP, mood, buddySubject, summaryHtml, aiNotice, aiSource,
-  readAsBase64, isTextFile, wireDrop, ymd, pad, DAY_SHORT, KINDS, KIND_ICON, PALETTE, UPLOAD_MAX,
+  readAsBase64, wireDrop, ymd, pad, DAY_SHORT, KINDS, KIND_ICON, PALETTE, UPLOAD_MAX,
   showBanner, hideBanner,
   register(name, feature) { features.push({ name, ...feature }); },
   refreshHelpers() { return { subjectOf, go, refresh }; },
