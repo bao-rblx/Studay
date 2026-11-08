@@ -1,1 +1,41 @@
-/* Files feature styles (docx/pptx/xlsx support). Owned by the files wave. */
+/* Files feature styles (docx/pptx/xlsx support). Owned by the files wave.
+   Only the drop panel, the "what I read" card and its bits live here; the shared glass
+   panel, .drop, .ai-* and .row-actions rules come from styles.css. */
+
+.file-types { display: flex; flex-wrap: wrap; gap: .35rem; margin: .2rem 0 .6rem; }
+
+.file-chip {
+  font-size: .72rem; font-weight: 600; letter-spacing: .01em; color: var(--ink-soft);
+  padding: .2rem .55rem; border-radius: 999px;
+  background: rgba(0, 122, 255, .1); border: 1px solid rgba(0, 122, 255, .18);
+}
+
+.file-hint { margin: 0; font-size: .82rem; color: var(--muted); }
+
+/* What the extractor read, before the student saves it */
+.file-read h3 { margin: 0 0 .35rem; }
+.file-meta { font-size: .86rem; color: var(--ink-soft); margin: 0 0 .5rem; }
+.file-meta strong { font-weight: 700; }
+
+.file-warn {
+  font-size: .84rem; margin: .2rem 0 .6rem; padding: .5rem .8rem;
+  border-left: 4px solid var(--accent); border-radius: 8px;
+  background: rgba(255, 159, 10, .12);
+}
+
+.file-preview { margin: .6rem 0; }
+.file-preview summary { cursor: pointer; font-size: .85rem; color: var(--brand); font-weight: 600; }
+.file-preview pre {
+  max-height: 15rem; overflow: auto; margin: .5rem 0 0; padding: .8rem;
+  font-size: .78rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  color: var(--ink-soft); background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-edge); border-radius: var(--radius-sm);
+}
+
+/* Failures: a wrong file type, a damaged document, no text inside */
+.file-problem {
+  border-left: 4px solid var(--danger); font-size: .9rem; line-height: 1.5;
+}
+.file-problem strong { font-weight: 700; }
+
+.file-saved { border-left: 4px solid var(--ok); font-size: .9rem; }
