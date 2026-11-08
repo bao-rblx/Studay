@@ -69,7 +69,7 @@ function showIntro() {
   box.innerHTML = card(`<h3>Ready when you are</h3>
     <p class="hint">${esc(subject.name)}: ${plural(stock.notes, 'note', 'notes')} and
       ${plural(stock.files, 'file', 'files')}. One question at a time, no timer.</p>
-    <button type="button" id="quiz-big-start">Start ${QUIZ_COUNT} questions</button>
+    <button type="button" id="quiz-big-start">Start a quiz</button>
     ${best ? `<p class="quiz-best-note">Your best: ${best.score}/${best.total}</p>` : ''}`);
   $('quiz-big-start').addEventListener('click', startSelected);
 }
@@ -248,7 +248,9 @@ function finish() {
     </div>
     ${record.newBest ? '<p class="quiz-badge">🏅 New best for this subject</p>' : ''}
     <div class="quiz-actions">
-      ${run.missed.length ? `<button type="button" id="quiz-retry">Practise the ${run.missed.length} I missed</button>` : ''}
+      ${run.missed.length
+    ? `<button type="button" id="quiz-retry">Practise the ${run.missed.length} I missed</button>`
+    : ''}
       <button type="button" id="quiz-again" class="${run.missed.length ? 'ghost' : ''}">One more quiz</button>
     </div>
     ${record.line ? `<p class="quiz-best-note">${esc(record.line)}</p>` : ''}`);
