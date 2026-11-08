@@ -45,10 +45,15 @@ function hideBanner() { $('status-banner').classList.add('hidden'); }
 
 // ---------- small helpers ----------
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Progress (XP, streak, quiz history) belongs to the account, not to the browser, so the
+// keys get a per-user prefix once somebody is signed in. The theme is a device
+// preference and stays shared.
 const store = {
-  get: (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  ns: '',
+  get: (k, d) => { try { const v = JSON.parse(localStorage.getItem(store.ns + k)); return v ?? d; } catch { return d; } },
+  set: (k, v) => localStorage.setItem(store.ns + k, JSON.stringify(v)),
 };
+const themePref = () => localStorage.getItem('sd_theme') || 'light';
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -137,8 +142,12 @@ async function bootAuth() {
 }
 function signedIn(user) {
   state.user = user;
+  // Switch progress storage to this account's namespace before anything reads it.
+  store.ns = user && user.id ? `sd.u${user.id}.` : '';
   renderUserChip();
   hideAuth();
+  touchStreak();
+  $('xp-val').textContent = store.get('sd_xp', 0);
   features.forEach((f) => { try { f.init?.(); } catch (err) { console.error(`[feature:${f.name}] init failed`, err); } });
   return refresh().catch(() => {});
 }
@@ -146,6 +155,7 @@ async function logout() {
   try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* the cookie is gone either way */ }
   state.user = null;
   state.subjects = []; state.notes = []; state.materials = []; state.events = [];
+  store.ns = '';
   renderUserChip();
   showAuth();
 }
@@ -177,7 +187,7 @@ function go(view) {
 document.querySelectorAll('.nav-btn[data-view]').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
 $('theme-toggle').addEventListener('click', () => {
   document.body.classList.toggle('dark');
-  store.set('sd_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  localStorage.setItem('sd_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
 });
 
 // ---------- data loading ----------
@@ -566,7 +576,7 @@ window.Studay = Studay;
 
 // ---------- boot ----------
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('modal').classList.contains('hidden')) closeModal(); });
-if (store.get('sd_theme', 'light') === 'dark') document.body.classList.add('dark');
+if (themePref() === 'dark') document.body.classList.add('dark');
 setAuthMode('login');
-touchStreak(); drawTimer(); renderTimerLog(); mood('idle');
+drawTimer(); renderTimerLog(); mood('idle');
 document.addEventListener('DOMContentLoaded', () => { bootAuth(); });
